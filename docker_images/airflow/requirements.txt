@@ -1,0 +1,7 @@
+apache-airflow-providers-apache-spark
+apache-airflow[amazon]
+apache-airflow-providers-amazon
+pandas
+python-dotenv
+SQLAlchemy
+psycopg2-binary
