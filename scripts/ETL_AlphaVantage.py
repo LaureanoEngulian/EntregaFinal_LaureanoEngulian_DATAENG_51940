@@ -1,17 +1,21 @@
+from datetime import datetime
 from typing import List
 
 import requests
 from commons import SparkETL
-
 # Import SparkSession
 from pyspark.sql import Row
 from pyspark.sql.functions import col, concat
 
 
 class AlphaVantageETL(SparkETL):
-    def __init__(self):
-        def __init__(self, job_name=None):
-            super().__init__(job_name)
+    def __init__(self, job_name=None):
+        super().__init__(job_name)
+        self.process_date = datetime.now().strftime("%Y-%m-%d")
+
+    def run(self):
+        process_date = datetime.now().strftime("%Y-%m-%d")
+        self.execute(process_date)
 
     def extract(self, symbol: str, api_key: str):
         """

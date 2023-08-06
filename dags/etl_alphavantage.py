@@ -1,4 +1,8 @@
 import sys
+
+sys.path.append("/opt/airflow/scripts")
+import ETL_AlphaVantage
+
 from datetime import datetime, timedelta
 from os import environ as env
 
@@ -6,9 +10,6 @@ from airflow import DAG
 from airflow.models import Variable
 from airflow.operators.python_operator import PythonOperator
 
-from ETL_AlphaVantage import AlphaVantageETL
-
-sys.path.append("/opt/airflow/scripts")
 
 # Define DAG arguments
 default_args = {
@@ -28,7 +29,7 @@ dag = DAG(
 )
 
 # Instance of the AlphaVantageETL class
-etl_instance = AlphaVantageETL()
+etl_instance = ETL_AlphaVantage.AlphaVantageETL()
 
 symbol_list = ["GOOG", "AMZN", "METV", "AAPL", "MSFT"]
 
