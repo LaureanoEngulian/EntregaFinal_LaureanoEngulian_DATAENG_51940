@@ -1,28 +1,52 @@
-# Este es el DAG que orquesta el ETL de la tabla users
-
+from os import environ as env
 from datetime import datetime, timedelta
-
 from airflow import DAG
-from airflow.operators.bash import BashOperator
+from airflow.operators.python_operator import PythonOperator
+from scripts.ETL_AlphaVantage import AlphaVantageETL
 
-defaul_args = {
-    "owner": "Laureano Engulian",
-    "start_date": datetime(2023, 7, 23),
-    "retries": 0,
-    "retry_delay": timedelta(seconds=5),
+# Define DAG arguments
+default_args = {
+    'owner': 'Laureano Engulian',
+    'start_date': datetime(2023, 8, 6),
+    'retries': 1,
+    'retry_delay': timedelta(minutes=2),
+
 }
 
-with DAG(
-    dag_id="AlphaVantageETL",
-    default_args=defaul_args,
-    description="ETL de la tabla big_five_weekly",
-    schedule_interval="@daily",
+# Create a DAG instance
+dag = DAG(
+    'alpha_vantage_etl_dag',
+    default_args=default_args,
+    description='DAG for AlphaVantage ETL process - big_five_weekly table',
+    schedule_interval='@daily',
     catchup=False,
-) as dag:
+)
 
-    etl = BashOperator(
-        task_id="execute_python",
-        bash_command="python3 /opt/airflow/scripts/AlphaVantageETL.py",
-    )
+# Instance of the AlphaVantageETL class
+etl_instance = AlphaVantageETL()
 
-    etl
+symbol_list = ['GOOG', 'AMZN', 'METV', 'AAPL', 'MSFT']
+
+# Define tasks as Python functions
+def combine_data_task():
+    etl_instance.combine_data(symbol_list=symbol_list, api_key= env["API_KEY"])
+
+def transform_task():
+    df_combined = etl_instance.combine_data(symbol_list=symbol_list, api_key= env["API_KEY"])
+    etl_instance.transform(df_combined)
+
+# Create operations using the PythonOperator
+combine_data_operator = PythonOperator(
+    task_id='combine_data_task',
+    python_callable=combine_data_task,
+    dag=dag,
+)
+
+transform_operator = PythonOperator(
+    task_id='transform_task',
+    python_callable=transform_task,
+    dag=dag,
+)
+
+# Define the sequence of tasks
+combine_data_operator >> transform_operator

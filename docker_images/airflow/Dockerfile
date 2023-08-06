@@ -6,7 +6,7 @@ RUN python -m pip install apache-airflow-providers-apache-spark
 USER root
 
 # Install OpenJDK-11
-RUN apt update && \
+RUN apt-get update  --allow-unauthenticated && \
     apt-get install -y openjdk-11-jdk && \
     apt-get install -y ant && \
     apt-get clean;
@@ -22,4 +22,4 @@ RUN python -m pip install --upgrade pip
 COPY ./requirements.txt /
 RUN pip install -r /requirements.txt
 
-# docker build LaureanoEngulian/airflow:airflow_2_6_2.
+# docker build -t laureanoengulian/airflow:airflow_2_6_2 .

@@ -79,10 +79,6 @@ class AlphaVantageETL(SparkETL):
             "pk", (concat(col("symbol"), col("week_from")))
         )
 
+        df_combined.show()
+
         return df_combined
-
-
-if __name__ == "__main__":
-    print("Running script")
-    etl = AlphaVantageETL()
-    etl.run()
