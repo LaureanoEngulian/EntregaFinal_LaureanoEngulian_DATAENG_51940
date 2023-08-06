@@ -1,48 +1,53 @@
-# Este script está pensado para correr en Spark y hacer el proceso de ETL
 from os import environ as env
-import time
-from datetime import datetime
-
-import pandas as pd
-import psycopg2
 import requests
-import sqlalchemy as sa
-from sqlalchemy.engine.url import URL
+# Import SparkSession
+from pyspark.sql import Row, SparkSession
+from pyspark.sql import functions as f
+from pyspark.sql.functions import (col, concat, expr, lag, lit, max, round,
+                                   to_date, when)
+from pyspark.sql.window import Window
 
-class ETL_AlphaVantage:
+from commons import SparkETL
+
+class AlphaVantageETL(SparkETL):
     def __init__(self):
-        print(datetime.now())
+         def __init__(self, job_name=None):
+            super().__init__(job_name)
 
-    def extract(self):
+    def extract(self, symbol):
         """
-        Extrae datos de la API AlphaVantage
-        Replace the "demo" apikey below with your own key from https://www.alphavantage.co/support/#api-key (Free API keys)
-        Big Five Tech: Google, Amazon, Meta, Apple, and Microsoft (GAMAM)
+        Get a "demo" apikey below with your own key from https://www.alphavantage.co/support/#api-key (Free API keys)
+        Extract data from the AlphaVantage API for a specific symbol.
         """
-        print(">>> [E] Extrayendo datos de la API...")
+        print(">>> [E] Extracting data from the API...")
 
-        function = 'TIME_SERIES_WEEKLY'
-        symbols = ['GOOG', 'AMZN', 'METV', 'AAPL', 'MSFT']
-        api_key = 'WNHSBPLUX5B8HNMZ'
+        try:
+            url = f'https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY&symbol={symbol}&apikey={env["API_KEY"]}'
+            response = requests.get(url)
+            
+            if response.status_code != 200:
+                raise Exception(f"API request failed with status code: {response.status_code}")
+            
+            json_data = response.json().get("Monthly Time Series")
 
-        df = pd.DataFrame()
+            data_rows = [
+                Row(date=date, symbol=symbol, **values)
+                for date, values in json_data.items()
+            ]
 
-        for symbol in symbols:
-            url = f'https://www.alphavantage.co/query?function={function}&symbol={symbol}&apikey={api_key}'
-            r = requests.get(url)
-            data = r.json()
-
-            time.sleep(5)
-
-            symbol_df = pd.DataFrame(data['Weekly Time Series'])
-            symbol_df = symbol_df.T
-            symbol_df.reset_index(inplace=True)
-
-            symbol_df['symbol'] = data['Meta Data']['2. Symbol']
-
-            df = pd.concat([df, symbol_df])
-
-        return df
+            df = self.spark.createDataFrame(data_rows)
+            df = df.withColumnRenamed("1. open", "open") \
+                .withColumnRenamed("2. high", "high") \
+                .withColumnRenamed("3. low", "low") \
+                .withColumnRenamed("4. close", "close") \
+                .withColumnRenamed("5. volume", "volume")
+            
+            # df.show(truncate=True)
+            return df
+        except Exception as e:
+            print(f"An error occurred: {str(e)}")
+            return None
+       
 
     def transform(self, df_original):
         """
@@ -50,13 +55,22 @@ class ETL_AlphaVantage:
         """
         print(">>> [T] Transformando datos...")
 
-        df_original.rename(columns={'index': 'week_from', '1. open': 'open', '2. high': 'high', '3. low': 'low',
-                                    '4. close': 'close', '5. volume': 'volume'}, inplace=True)
-        
-        df_original['open'] = pd.to_numeric(df_original['open'])
-        df_original['close'] = pd.to_numeric(df_original['close'])
-        df_original['avg'] = (df_original['open'] + df_original['close'])/2
-        df_original['pk'] = df_original['symbol']+df_original['week_from']
+        df_original.rename(
+            columns={
+                "index": "week_from",
+                "1. open": "open",
+                "2. high": "high",
+                "3. low": "low",
+                "4. close": "close",
+                "5. volume": "volume",
+            },
+            inplace=True,
+        )
+
+        df_original["open"] = pd.to_numeric(df_original["open"])
+        df_original["close"] = pd.to_numeric(df_original["close"])
+        df_original["avg"] = (df_original["open"] + df_original["close"]) / 2
+        df_original["pk"] = df_original["symbol"] + df_original["week_from"]
 
         df_original.reset_index(inplace=True)
         print(df_original.head())
@@ -71,35 +85,31 @@ class ETL_AlphaVantage:
         print(datetime.now())
 
         url = URL.create(
-        drivername='redshift+redshift_connector', # indicate redshift_connector driver and dialect will be used
-        host=env.get('HOST'), # Amazon Redshift host
-        port=int(env.get('PORT')), # Amazon Redshift port
-        database=env.get('DATABASE'), # Amazon Redshift database
-        username=env.get('USER'), # Amazon Redshift username
-        password=env.get('PASSWORD') # Amazon Redshift password
+            drivername="redshift+redshift_connector",  # indicate redshift_connector driver and dialect will be used
+            host=env.get("HOST"),  # Amazon Redshift host
+            port=int(env.get("PORT")),  # Amazon Redshift port
+            database=env.get("DATABASE"),  # Amazon Redshift database
+            username=env.get("USER"),  # Amazon Redshift username
+            password=env.get("PASSWORD"),  # Amazon Redshift password
         )
 
         engine = sa.create_engine(url)
 
-        df_final.to_sql(name='stage',
-                        con=engine,
-                        if_exists='append',
-                        index=False)
+        df_final.to_sql(name="stage", con=engine, if_exists="append", index=False)
 
         # Connect to Redshift using psycopg2
         conn = psycopg2.connect(
-            host=env.get('HOST'),
-            port=int(env.get('PORT')),
-            database=env.get('DATABASE'),
-            user=env.get('USER'),
-            password=env.get('PASSWORD')
+            host=env.get("HOST"),
+            port=int(env.get("PORT")),
+            database=env.get("DATABASE"),
+            user=env.get("USER"),
+            password=env.get("PASSWORD"),
         )
 
         cursor = conn.cursor()
 
-
         # https://docs.aws.amazon.com/redshift/latest/dg/merge-replacing-existing-rows.html
-        sql_transaction = ''' begin transaction;
+        sql_transaction = """ begin transaction;
 
                             
                             CREATE TABLE IF NOT EXISTS laureanoengulian_coderhouse.big_five_weekly(
@@ -130,38 +140,40 @@ class ETL_AlphaVantage:
                             from laureanoengulian_coderhouse.stage;
 
                             end transaction;
-                        '''
+                        """
 
         cursor.execute(sql_transaction)
         conn.commit()
 
-        drop_tmp = '''drop table if exists laureanoengulian_coderhouse.stage;'''
+        drop_tmp = """drop table if exists laureanoengulian_coderhouse.stage;"""
 
         cursor.execute(drop_tmp)
         conn.commit()
 
         # Chequeo de valores únicos
         cursor = conn.cursor()
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
         SELECT
         count(pk), count(distinct pk)
         FROM
         laureanoengulian_coderhouse.big_five_weekly;
-        """)
+        """
+        )
         # resultado = cursor.fetchall()
         print(", ".join(map(lambda x: str(x), cursor.fetchall())))
         cursor.close()
-        
+
         print(">>> [L] Datos cargados exitosamente")
 
-        
     def run(self):
         raw_data = self.extract()
         # self.transform(raw_data)
         clean_data = self.transform(raw_data)
         self.load(clean_data)
 
+
 if __name__ == "__main__":
-    print("Corriendo script")
-    etl = ETL_AlphaVantage()
+    print("Running script")
+    etl = AlphaVantageETL()
     etl.run()

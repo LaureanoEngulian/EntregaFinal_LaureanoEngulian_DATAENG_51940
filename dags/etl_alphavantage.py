@@ -13,7 +13,7 @@ defaul_args = {
 }
 
 with DAG(
-    dag_id="etl_alphavantage",
+    dag_id="AlphaVantageETL",
     default_args=defaul_args,
     description="ETL de la tabla big_five_weekly",
     schedule_interval="@daily",
@@ -22,7 +22,7 @@ with DAG(
 
     etl = BashOperator(
         task_id="execute_python",
-        bash_command="python3 /opt/airflow/scripts/ETL_AlphaVantage.py",
+        bash_command="python3 /opt/airflow/scripts/AlphaVantageETL.py",
     )
 
     etl

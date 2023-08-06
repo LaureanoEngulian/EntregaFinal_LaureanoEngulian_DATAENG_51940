@@ -25,4 +25,4 @@ cd entrega_3
 docker-compose up
 ```
 7. Una vez que los servicios estén levantados, ingresar a Airflow en `http://localhost:8080/`.
-8. Ejecutar el DAG `etl_alphavantage`.
+8. Ejecutar el DAG `AlphaVantageETL`.
