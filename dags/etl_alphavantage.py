@@ -39,11 +39,11 @@ def combine_data_task():
     etl_instance.combine_data(symbol_list=symbol_list, api_key=env["API_KEY"])
 
 
-def transform_task():
-    df_combined = etl_instance.combine_data(
-        symbol_list=Variable.get("symbol_list"), api_key=env["API_KEY"]
-    )
-    etl_instance.transform(df_combined)
+# def transform_task():
+#     df_combined = etl_instance.combine_data(
+#         symbol_list=Variable.get("symbol_list"), api_key=env["API_KEY"]
+#     )
+#     etl_instance.transform(df_combined)
 
 
 # Create operations using the PythonOperator
@@ -53,11 +53,11 @@ combine_data_operator = PythonOperator(
     dag=dag,
 )
 
-transform_operator = PythonOperator(
-    task_id="transform_task",
-    python_callable=transform_task,
-    dag=dag,
-)
+# transform_operator = PythonOperator(
+#     task_id="transform_task",
+#     python_callable=transform_task,
+#     dag=dag,
+# )
 
 # Define the sequence of tasks
-combine_data_operator >> transform_operator
+combine_data_operator # >> transform_operator
