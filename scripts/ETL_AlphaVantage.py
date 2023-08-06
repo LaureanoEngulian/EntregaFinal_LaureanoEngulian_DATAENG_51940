@@ -1,4 +1,3 @@
-from os import environ as env
 from typing import List
 
 import requests
@@ -46,8 +45,8 @@ class AlphaVantageETL(SparkETL):
                 .withColumnRenamed("5. volume", "volume")
             )
 
-            # df.show(truncate=True)
             return df
+        
         except Exception as e:
             print(f"An error occurred: {str(e)}")
             return None
