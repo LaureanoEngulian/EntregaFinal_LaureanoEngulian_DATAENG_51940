@@ -1,14 +1,9 @@
-import sys
-
-sys.path.append("/opt/airflow/scripts")
-import ETL_AlphaVantage
-
 from datetime import datetime, timedelta
-from os import environ as env
 
 from airflow import DAG
 from airflow.models import Variable
-from airflow.operators.python_operator import PythonOperator
+from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+
 
 
 # Define DAG arguments
@@ -28,36 +23,14 @@ dag = DAG(
     catchup=False,
 )
 
-# Instance of the AlphaVantageETL class
-etl_instance = ETL_AlphaVantage.AlphaVantageETL()
+etl_alphavantage = SparkSubmitOperator(
+        task_id = "etl_alphavantage",
+        application = '/opt/airflow/scripts/ETL_AlphaVantage.py',
+        conn_id = "spark_default",
+        dag = dag,
+        driver_class_path = Variable.get("driver_class_path"),
+    )
 
-symbol_list = ["GOOG", "AMZN", "METV", "AAPL", "MSFT"]
-
-
-# Define tasks as Python functions
-def combine_data_task():
-    etl_instance.combine_data(symbol_list=symbol_list, api_key=env["API_KEY"])
-
-
-# def transform_task():
-#     df_combined = etl_instance.combine_data(
-#         symbol_list=Variable.get("symbol_list"), api_key=env["API_KEY"]
-#     )
-#     etl_instance.transform(df_combined)
-
-
-# Create operations using the PythonOperator
-combine_data_operator = PythonOperator(
-    task_id="combine_data_task",
-    python_callable=combine_data_task,
-    dag=dag,
-)
-
-# transform_operator = PythonOperator(
-#     task_id="transform_task",
-#     python_callable=transform_task,
-#     dag=dag,
-# )
 
 # Define the sequence of tasks
-combine_data_operator # >> transform_operator
+etl_alphavantage 
