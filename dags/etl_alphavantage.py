@@ -54,8 +54,7 @@ def send_email(**kwargs):
 
     subject = "Resultado del proceso"
     if result_value is not None:
-        if result_value[0] == 1:
-            print(result_value[0])
+        if result_value[0][0] == 1:
             message = "Proceso exitoso. No hay duplicados."
         else:
             message = "Error en el proceso. Se generaron duplicados."
